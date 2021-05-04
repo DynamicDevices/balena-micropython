@@ -1,0 +1,28 @@
+FROM balenalib/%%BALENA_MACHINE_NAME%%-debian:latest as build
+
+# Install build dependencies
+RUN install_packages git build-essential libffi-dev pkg-config python3
+
+# Setup a build user for the abuild
+RUN adduser --system --disabled-password build
+
+WORKDIR /home/build
+USER build
+
+RUN git clone https://github.com/micropython/micropython.git
+RUN cd micropython/ports/unix \
+    && make clean \
+    && make axtls
+RUN cd micropython/mpy-cross \
+    && make
+RUN cd micropython/ports/unix \
+    && make
+
+FROM balenalib/%%BALENA_MACHINE_NAME%%-debian:latest as target
+
+COPY --from=build /home/build/micropython/ports/unix/micropython /usr/bin/micropython
+
+#COPY build.sh .
+COPY scripts/ .
+
+CMD [ "./autorun.sh" ]
